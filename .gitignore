@@ -1,0 +1,25 @@
+# Virtual Environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Env file
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+Dockerfile
+docker-compose.dev.yml

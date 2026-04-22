@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart_water_purifier"
+version = "2026.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.134.0",
+    "uvicorn[standard]==0.41.0",
+    "python-dotenv==1.2.1",
+    "sqlalchemy==2.0.47",
+    "asyncpg==0.31.0",
+    "sqlmodel==0.0.37",
+    "redis[hiredis]==6.4.0",
+    "pydantic-settings==2.2.1",
+    "email-validator",
+    "passlib"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "alembic"
+]
+
+[tool.setuptools]
+packages = ["app"]
