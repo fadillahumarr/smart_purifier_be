@@ -16,13 +16,16 @@ dependencies = [
     "redis[hiredis]==6.4.0",
     "pydantic-settings==2.2.1",
     "email-validator",
-    "passlib"
+    "python-jose[cryptography]",
+    "passlib[bcrypt]==1.7.4",
+    "bcrypt==4.0.1"
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff",
-    "alembic"
+    "alembic",
+    "psycopg"
 ]
 
 [tool.setuptools]
