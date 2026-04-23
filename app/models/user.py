@@ -1,9 +1,8 @@
-from sqlmodel import Field
+from sqlmodel import SQLModel, Field
 
 from app.models.base import UUIDPrimaryKeyModel, TimestampModel
 
-
-class User(UUIDPrimaryKeyModel, TimestampModel, table=True):
+class User(UUIDPrimaryKeyModel, TimestampModel, SQLModel, table=True):
     __tablename__ = "users"
 
     name: str = Field(max_length=100, nullable=False)

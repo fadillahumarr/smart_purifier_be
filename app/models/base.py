@@ -1,33 +1,24 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
-from sqlalchemy.sql import func
-from sqlalchemy import Column, DateTime
+import sqlalchemy as sa
+from sqlmodel import Field
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
-
-class UUIDPrimaryKeyModel(SQLModel):
+class UUIDPrimaryKeyModel:
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 
-
-class TimestampModel(SQLModel):
+class TimestampModel:
     created_at: datetime = Field(
         default_factory=utc_now,
-        sa_column=Column(
-            DateTime(timezone=True),
-            nullable=False,
-            server_default=func.now()
-        )
+        sa_type=sa.DateTime(timezone=True),
+        nullable=False,
     )
     updated_at: datetime = Field(
         default_factory=utc_now,
-        sa_column=Column(
-            DateTime(timezone=True),
-            nullable=False,
-            onupdate=utc_now
-        )
+        sa_type=sa.DateTime(timezone=True),
+        nullable=False,
     )

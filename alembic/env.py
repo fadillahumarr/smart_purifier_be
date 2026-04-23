@@ -1,18 +1,16 @@
 from logging.config import fileConfig
-from pathlib import Path
-import sys
 
-from sqlalchemy import engine_from_config, pool
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from app.core.config import settings
-from app.models import *
+import app.models  # noqa: F401
+
 
 config = context.config
 
+# pakai DATABASE_URL dari .env, tapi ubah asyncpg -> sync driver untuk Alembic
 config.set_main_option(
     "sqlalchemy.url",
     settings.DATABASE_URL.replace("+asyncpg", "+psycopg")
