@@ -6,29 +6,33 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class WaterPurifierCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    location: str | None = Field(default=None, max_length=150)
-    mac_address: str | None = Field(default=None, max_length=50)
+    location: str = Field(min_length=1, max_length=150)
+    mac_address: str = Field(min_length=1, max_length=50)
     device_code: str = Field(min_length=1, max_length=100)
     mqtt_topic_base: str = Field(min_length=1, max_length=150)
-    firmware_version: str | None = Field(default=None, max_length=50)
+    firmware_version: str = Field(min_length=1, max_length=50)
 
 
 class WaterPurifierUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
-    location: str | None = Field(default=None, max_length=150)
-    mac_address: str | None = Field(default=None, max_length=50)
-    firmware_version: str | None = Field(default=None, max_length=50)
+    location: str | None = Field(default=None, min_length=1, max_length=150)
+    mac_address: str | None = Field(default=None, min_length=1, max_length=50)
+    device_code: str | None = Field(default=None, min_length=1, max_length=100)
+    mqtt_topic_base: str | None = Field(
+        default=None, min_length=1, max_length=150)
+    firmware_version: str | None = Field(
+        default=None, min_length=1, max_length=50)
 
 
 class WaterPurifierRead(BaseModel):
     id: UUID
     user_id: UUID
     name: str
-    location: str | None
-    mac_address: str | None
+    location: str
+    mac_address: str
     device_code: str
     mqtt_topic_base: str
-    firmware_version: str | None
+    firmware_version: str
     created_at: datetime
     updated_at: datetime
 
