@@ -20,6 +20,3 @@ dist/
 # IDE
 .vscode/
 .idea/
-
-Dockerfile
-docker-compose.dev.yml
