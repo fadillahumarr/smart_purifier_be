@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smart_water_purifier_db
+    environment:
+      POSTGRES_USER: smart_water_purifier
+      POSTGRES_PASSWORD: icoreuntl2026
+      POSTGRES_DB: water_purifier_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smart_water_purifier -d water_purifier_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: smart_water_purifier_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+  
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: smart_water_purifier_mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+    restart: unless-stopped
+
+  adminer:
+    image: adminer
+    container_name: smart_water_purifier_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+  
+volumes:
+  postgres_data:
+  redis_data:
