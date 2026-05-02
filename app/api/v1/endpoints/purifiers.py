@@ -8,6 +8,8 @@ from app.core.database import get_session
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.water_purifier import WaterPurifier
+from app.models.tank import Tank
+from app.models.enums import TankType
 from app.schemas.water_purifier import (
     WaterPurifierCreate,
     WaterPurifierRead,
@@ -17,22 +19,24 @@ from app.schemas.water_purifier import (
 router = APIRouter(prefix="/purifiers", tags=["purifiers"])
 
 
-@router.post("", response_model=WaterPurifierRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/create",
+    response_model=WaterPurifierRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_purifier(
     payload: WaterPurifierCreate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    conditions = [
-        WaterPurifier.device_code == payload.device_code,
-        WaterPurifier.mqtt_topic_base == payload.mqtt_topic_base,
-    ]
-
-    if payload.mac_address:
-        conditions.append(WaterPurifier.mac_address == payload.mac_address)
-
     existing = await session.scalar(
-        select(WaterPurifier).where(or_(*conditions))
+        select(WaterPurifier).where(
+            or_(
+                WaterPurifier.device_code == payload.device_code,
+                WaterPurifier.mqtt_topic_base == payload.mqtt_topic_base,
+                WaterPurifier.mac_address == payload.mac_address,
+            )
+        )
     )
 
     if existing:
@@ -52,6 +56,27 @@ async def create_purifier(
     )
 
     session.add(purifier)
+    await session.flush()
+
+    tanks = [
+        Tank(
+            water_purifier_id=purifier.id,
+            tank_type=TankType.raw,
+            name="Tangki Raw Water",
+        ),
+        Tank(
+            water_purifier_id=purifier.id,
+            tank_type=TankType.mixing,
+            name="Tangki Mixing",
+        ),
+        Tank(
+            water_purifier_id=purifier.id,
+            tank_type=TankType.settling,
+            name="Tangki Settling",
+        ),
+    ]
+
+    session.add_all(tanks)
     await session.commit()
     await session.refresh(purifier)
 
@@ -68,6 +93,7 @@ async def list_purifiers(
         .where(WaterPurifier.user_id == current_user.id)
         .order_by(WaterPurifier.created_at.desc())
     )
+
     return result.all()
 
 
@@ -114,6 +140,37 @@ async def update_purifier(
         )
 
     update_data = payload.model_dump(exclude_unset=True)
+
+    duplicate_conditions = []
+
+    if "device_code" in update_data:
+        duplicate_conditions.append(
+            WaterPurifier.device_code == update_data["device_code"]
+        )
+
+    if "mqtt_topic_base" in update_data:
+        duplicate_conditions.append(
+            WaterPurifier.mqtt_topic_base == update_data["mqtt_topic_base"]
+        )
+
+    if "mac_address" in update_data:
+        duplicate_conditions.append(
+            WaterPurifier.mac_address == update_data["mac_address"]
+        )
+
+    if duplicate_conditions:
+        existing = await session.scalar(
+            select(WaterPurifier).where(
+                WaterPurifier.id != purifier_id,
+                or_(*duplicate_conditions),
+            )
+        )
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Device code, MQTT topic, or MAC address already exists",
+            )
 
     for field, value in update_data.items():
         setattr(purifier, field, value)
