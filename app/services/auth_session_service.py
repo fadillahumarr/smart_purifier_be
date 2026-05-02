@@ -9,6 +9,7 @@ from app.core.security import (
     hash_refresh_token,
 )
 
+
 class AuthSessionService:
     PREFIX = "auth:refresh"
 
@@ -35,7 +36,8 @@ class AuthSessionService:
             ex=ttl,
         )
 
-        access_token = create_access_token(user_id=user_id, session_id=session_id)
+        access_token = create_access_token(
+            user_id=user_id, session_id=session_id)
 
         return {
             "access_token": access_token,
@@ -47,7 +49,6 @@ class AuthSessionService:
     async def refresh_session(cls, refresh_token: str) -> dict | None:
         refresh_hash = hash_refresh_token(refresh_token)
 
-        # scan sederhana untuk MVP
         async for key in redis_client.scan_iter(match=f"{cls.PREFIX}:*"):
             raw = await redis_client.get(key)
             if not raw:
@@ -61,10 +62,8 @@ class AuthSessionService:
                 old_session_id = key.split(":")[-1]
                 user_id = data["user_id"]
 
-                # rotation: hapus session lama
                 await redis_client.delete(key)
 
-                # buat session baru
                 return await cls.create_session(user_id=user_id)
 
         return None
