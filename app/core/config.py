@@ -22,17 +22,31 @@ class Settings(BaseSettings):
     MQTT_PASSWORD: str | None = None
 
     # CORS
-    CORS_ORIGINS: list[str] = []
+    CORS_ORIGINS: str | list[str] = []
 
     # Config
     APP_NAME: str = "Smart Water Purifier"
     DEBUG: bool = True
 
+    # Validator
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
+        if not v:
+            return []
+
+        if isinstance(v, list):
+            return v
+
         if isinstance(v, str):
+            v = v.strip()
+
+            if v.startswith("["):
+                import json
+                return json.loads(v)
+
             return [origin.strip() for origin in v.split(",")]
+
         return v
 
     model_config = SettingsConfigDict(
