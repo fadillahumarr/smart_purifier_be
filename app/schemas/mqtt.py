@@ -24,16 +24,14 @@ class MqttCycleStatePayload(BaseModel):
     status: CycleStatus
     recorded_at: datetime
 
-
-class SensorValueItem(BaseModel):
-    sensor_type: SensorType
-    value: float
-
-
 class MqttSensorReadingsPayload(BaseModel):
     mac_address: str = Field(min_length=1, max_length=50)
     tank_type: TankType
-    readings: list[SensorValueItem]
+    tds: float | None = None
+    turbidity: float | None = None
+    water_volume: float | None = None
+    temperature: float | None = None
+    ph: float | None = None
     recorded_at: datetime
 
 

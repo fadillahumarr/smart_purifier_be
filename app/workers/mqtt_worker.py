@@ -33,7 +33,14 @@ TOPIC_CYCLE_RESULT = "smart-water/+/cycle/result"
 
 async def process_message(topic: str, payload_bytes: bytes) -> None:
     payload_raw = payload_bytes.decode("utf-8")
-    data = json.loads(payload_raw)
+    try:
+        data = json.loads(payload_raw)
+    except json.JSONDecodeError:
+        logger.exception(
+            "Invalid JSON payload on topic %s",
+            topic,
+        )
+        return
 
     async with AsyncSessionLocal() as session:
         if topic.endswith("/status"):

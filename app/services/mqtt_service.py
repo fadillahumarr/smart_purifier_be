@@ -27,7 +27,7 @@ from app.services.alert_engine import (
 )
 
 REALTIME_TTL_SECONDS = 300
-REALTIME_WINDOW_SIZE = 300
+REALTIME_MAX_RECORDS = 300
 
 
 def normalize_mac(mac: str) -> str:
@@ -191,56 +191,97 @@ async def handle_sensor_readings(
     session: AsyncSession,
     payload: MqttSensorReadingsPayload,
 ) -> int:
-    purifier = await get_purifier_by_mac(session, payload.mac_address)
+    purifier = await get_purifier_by_mac(
+        session,
+        payload.mac_address,
+    )
+
     if not purifier:
         raise ValueError("Purifier not found for this mac_address")
 
-    tank = await get_tank_by_type(session, purifier.id, payload.tank_type)
+    tank = await get_tank_by_type(
+        session,
+        purifier.id,
+        payload.tank_type,
+    )
+
     if not tank:
-        raise ValueError("Tank not found for this purifier and tank_type")
+        raise ValueError(
+            "Tank not found for this purifier and tank_type"
+        )
 
     tank_type = tank_key(payload.tank_type)
 
-    latest_key = f"sensor:latest:{purifier.id}:{tank_type}"
-    window_key = f"sensor:window:{purifier.id}:{tank_type}"
+    latest_key = (
+        f"sensor:latest:{purifier.id}:{tank_type}"
+    )
 
-    recorded_at = payload.recorded_at
+    window_key = (
+        f"sensor:window:{purifier.id}:{tank_type}"
+    )
+
+    recorded_at = payload.recorded_at.isoformat()
 
     latest_data = {
         "water_purifier_id": str(purifier.id),
         "tank_id": str(tank.id),
         "tank_type": tank_type,
-        "recorded_at": recorded_at.isoformat(),
+        "recorded_at": recorded_at,
+
+        "tds": payload.tds,
+        "turbidity": payload.turbidity,
+        "ph": payload.ph,
+        "temperature": payload.temperature,
+        "water_volume": payload.water_volume,
     }
 
-    for item in payload.readings:
-        sensor_name = (
-            item.sensor_type.value
-            if hasattr(item.sensor_type, "value")
-            else str(item.sensor_type)
+    payload_json = json.dumps(latest_data)
+
+    async with redis_client.pipeline(
+        transaction=False
+    ) as pipe:
+
+        pipe.set(
+            latest_key,
+            payload_json,
+            ex=REALTIME_TTL_SECONDS,
         )
 
-        latest_data[sensor_name] = {
-            "value": item.value,
-            "recorded_at": recorded_at.isoformat(),
-        }
+        pipe.publish(
+            f"sensor:realtime:{purifier.id}",
+            payload_json,
+        )
 
-    await redis_client.set(
-        latest_key,
-        json.dumps(latest_data),
-        ex=REALTIME_TTL_SECONDS,
+        pipe.rpush(
+            window_key,
+            payload_json,
+        )
+
+        pipe.ltrim(
+            window_key,
+            -REALTIME_MAX_RECORDS,
+            -1,
+        )
+
+        pipe.expire(
+            window_key,
+            REALTIME_TTL_SECONDS,
+        )
+
+        await pipe.execute()
+
+    sensor_count = sum(
+        value is not None
+        for value in [
+            payload.tds,
+            payload.turbidity,
+            payload.ph,
+            payload.temperature,
+            payload.water_volume,
+        ]
     )
 
-    await redis_client.publish(
-        f"sensor:realtime:{purifier.id}",
-        json.dumps(latest_data),
-    )
-
-    await redis_client.rpush(window_key, json.dumps(latest_data))
-    await redis_client.ltrim(window_key, -REALTIME_WINDOW_SIZE, -1)
-    await redis_client.expire(window_key, REALTIME_TTL_SECONDS)
-
-    return len(payload.readings)
+    return sensor_count
 
 
 async def save_initial_raw_snapshot(

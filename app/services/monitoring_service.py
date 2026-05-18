@@ -129,23 +129,23 @@ def redis_sensor_metric(
     sensor_type: SensorType,
 ) -> MetricReadingOut:
     sensor_name = sensor_type.value
-    item = data.get(sensor_name)
+    value = data.get(sensor_name)
 
-    if isinstance(item, dict):
-        return MetricReadingOut(
-            value=item.get("value"),
-            unit=sensor_unit(sensor_type),
-            recorded_at=parse_datetime(item.get("recorded_at")),
-        )
+    if value is None:
+        return empty_metric(sensor_type)
 
-    if item is not None:
-        return MetricReadingOut(
-            value=float(item),
-            unit=sensor_unit(sensor_type),
-            recorded_at=parse_datetime(data.get("recorded_at")),
-        )
+    try:
+        parsed_value = float(value)
+    except (TypeError, ValueError):
+        return empty_metric(sensor_type)
 
-    return empty_metric(sensor_type)
+    return MetricReadingOut(
+        value=parsed_value,
+        unit=sensor_unit(sensor_type),
+        recorded_at=parse_datetime(
+            data.get("recorded_at")
+        ),
+    )
 
 
 async def get_latest_cycle(
@@ -263,27 +263,40 @@ async def get_settling_realtime(
 
 
 async def get_settling_trend(
-    session: AsyncSession,
     purifier_id: UUID,
     minutes: int = 30,
 ) -> list[TrendPointOut]:
-    key = f"sensor:window:{purifier_id}:{redis_tank_key(TankType.settling)}"
+    key = (
+        f"sensor:window:{purifier_id}:"
+        f"{redis_tank_key(TankType.settling)}"
+    )
 
     rows = await redis_client.lrange(key, 0, -1)
 
     grouped: dict[str, dict] = {}
 
+    cutoff = utc_now() - timedelta(minutes=minutes)
+
     for row in rows:
         item = json.loads(row)
 
         time_value = item.get("time") or item.get("recorded_at")
+
         if not time_value:
+            continue
+
+        parsed_time = parse_datetime(time_value)
+
+        if not parsed_time:
+            continue
+
+        if parsed_time < cutoff:
             continue
 
         point = grouped.setdefault(
             time_value,
             {
-                "time": parse_datetime(time_value),
+                "time": parsed_time,
                 "tds": None,
                 "turbidity": None,
                 "ph": None,
@@ -292,25 +305,20 @@ async def get_settling_trend(
             },
         )
 
-        if "sensor_type" in item and "value" in item:
-            sensor_name = item["sensor_type"]
-            if sensor_name in point:
-                point[sensor_name] = float(item["value"])
-        else:
-            for sensor_name in [
-                "tds",
-                "turbidity",
-                "ph",
-                "temperature",
-                "water_volume",
-            ]:
-                if item.get(sensor_name) is not None:
-                    value = item[sensor_name]
+        for sensor_name in [
+            "tds",
+            "turbidity",
+            "ph",
+            "temperature",
+            "water_volume",
+        ]:
+            value = item.get(sensor_name)
 
-                    if isinstance(value, dict):
-                        point[sensor_name] = value.get("value")
-                    else:
-                        point[sensor_name] = value
+            if value is not None:
+                try:
+                    point[sensor_name] = float(value)
+                except (TypeError, ValueError):
+                    continue
 
     points = [
         TrendPointOut(**point)
@@ -435,10 +443,14 @@ async def get_monitoring_realtime(
     trend_minutes: int = 30,
 ) -> MonitoringRealtimeOut:
     purifier = await get_purifier_or_none(session, purifier_id)
+
     if not purifier:
         raise ValueError("Purifier not found")
 
-    device_status = await get_latest_device_status(session, purifier_id)
+    device_status = await get_latest_device_status(
+        session,
+        purifier_id,
+    )
 
     settling_realtime = await get_settling_realtime(
         session,
@@ -446,7 +458,6 @@ async def get_monitoring_realtime(
     )
 
     settling_trend = await get_settling_trend(
-        session,
         purifier_id,
         minutes=trend_minutes,
     )

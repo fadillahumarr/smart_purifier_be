@@ -6,7 +6,10 @@ router = APIRouter(prefix="/ws", tags=["websocket"])
 
 
 @router.websocket("/monitoring/{purifier_id}")
-async def monitoring_ws(websocket: WebSocket, purifier_id: str):
+async def monitoring_ws(
+    websocket: WebSocket,
+    purifier_id: str,
+):
     await websocket.accept()
 
     pubsub = redis_client.pubsub()
@@ -16,10 +19,16 @@ async def monitoring_ws(websocket: WebSocket, purifier_id: str):
 
     try:
         async for message in pubsub.listen():
+
             if message["type"] != "message":
                 continue
 
-            await websocket.send_text(message["data"])
+            data = message["data"]
+
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+
+            await websocket.send_text(data)
 
     except WebSocketDisconnect:
         pass
