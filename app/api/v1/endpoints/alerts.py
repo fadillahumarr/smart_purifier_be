@@ -14,8 +14,6 @@ from app.services.alert_service import create_alert, list_alerts, resolve_alert
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
-
-@router.get("", response_model=AlertListOut)
 @router.get("", response_model=AlertListOut)
 async def read_alerts(
     status_filter: str = Query(default="all", alias="status"),
