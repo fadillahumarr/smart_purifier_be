@@ -1,23 +1,33 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
+import bcrypt
 from uuid import uuid4
 
 from jose import jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    password_bytes = password.encode("utf-8")
+
+    hashed = bcrypt.hashpw(
+        password_bytes,
+        bcrypt.gensalt()
+    )
+
+    return hashed.decode("utf-8")
 
 
-def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+def verify_password(password: str, hashed_password: str) -> bool:
+    password_bytes = password.encode("utf-8")
+    hashed_bytes = hashed_password.encode("utf-8")
+
+    return bcrypt.checkpw(
+        password_bytes,
+        hashed_bytes
+    )
 
 
 def create_access_token(user_id: str, session_id: str) -> str:
