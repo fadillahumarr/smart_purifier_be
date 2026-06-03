@@ -205,10 +205,16 @@ async def test_read_alerts_without_token(client):
 
 
 async def test_resolve_alert_success(client, monkeypatch):
+    token = await register_and_login(client)
     alert_id = uuid4()
 
-    async def fake_resolve_alert(session, alert_id_param):
-        assert alert_id_param == alert_id
+    async def fake_resolve_alert(
+        session,
+        alert_id,
+        user_id,
+    ):
+        assert alert_id == alert_id
+        assert user_id is not None
 
         return fake_alert_object(alert_id=alert_id)
 
@@ -218,7 +224,10 @@ async def test_resolve_alert_success(client, monkeypatch):
     )
 
     response = await client.patch(
-        f"{ALERT_PREFIX}/{alert_id}/resolve"
+        f"{ALERT_PREFIX}/{alert_id}/resolve",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
     )
 
     assert response.status_code == 200
@@ -233,9 +242,15 @@ async def test_resolve_alert_success(client, monkeypatch):
 
 
 async def test_resolve_alert_not_found(client, monkeypatch):
+    token = await register_and_login(client)
     alert_id = uuid4()
 
-    async def fake_resolve_alert(session, alert_id_param):
+    async def fake_resolve_alert(
+        session,
+        alert_id,
+        user_id,
+    ):
+        assert user_id is not None
         raise ValueError("Alert not found")
 
     monkeypatch.setattr(
@@ -244,7 +259,10 @@ async def test_resolve_alert_not_found(client, monkeypatch):
     )
 
     response = await client.patch(
-        f"{ALERT_PREFIX}/{alert_id}/resolve"
+        f"{ALERT_PREFIX}/{alert_id}/resolve",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
     )
 
     assert response.status_code == 404
@@ -252,7 +270,14 @@ async def test_resolve_alert_not_found(client, monkeypatch):
 
 
 async def test_active_alert_count_success(client, monkeypatch):
-    async def fake_get_active_alert_count(session):
+    token = await register_and_login(client)
+
+    async def fake_get_active_alert_count(
+        session,
+        user_id,
+    ):
+        assert user_id is not None
+
         return {
             "count": 3
         }
@@ -263,7 +288,10 @@ async def test_active_alert_count_success(client, monkeypatch):
     )
 
     response = await client.get(
-        f"{ALERT_PREFIX}/active-count"
+        f"{ALERT_PREFIX}/active-count",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
     )
 
     assert response.status_code == 200
