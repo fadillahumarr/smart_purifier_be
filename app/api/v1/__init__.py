@@ -1,4 +1,4 @@
-from app.api.v1.endpoints import auth, purifiers, tanks, dashboard, monitoring, cycle_history, alerts, ws
+from app.api.v1.endpoints import auth, purifiers, tanks, dashboard, monitoring, cycle_history, alerts, ws, device_provision
 
 __all__ = [
     "auth",
@@ -8,5 +8,6 @@ __all__ = [
     "monitoring",
     "cycle_history",
     "alerts",
-    "ws"
+    "ws",
+    "device_provision"
 ]
