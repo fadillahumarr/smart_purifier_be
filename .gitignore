@@ -1,12 +1,14 @@
 # Virtual Environment
 .venv/
 venv/
+env/
 
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py[cod]
 
 # Build
 build/
@@ -15,8 +17,30 @@ dist/
 
 # Env file
 .env
-.env.local
+.env.test
+.env.development
+.env.production
+
+# Keep env example
+!.env.example
+
+# Test / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linter / Formatter cache
+.mypy_cache/
+.ruff_cache/
 
 # IDE
 .vscode/
 .idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
