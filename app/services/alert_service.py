@@ -7,32 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import Alert
 from app.models.enums import AlertSeverity
 from app.models.water_purifier import WaterPurifier
-from app.schemas.alert import AlertCreate, AlertListOut, AlertOut, AlertActiveCountOut
+from app.schemas.alert import AlertListOut, AlertOut, AlertActiveCountOut
 
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
-
-
-async def create_alert(
-    session: AsyncSession,
-    payload: AlertCreate,
-) -> Alert:
-    alert = Alert(
-        water_purifier_id=payload.water_purifier_id,
-        purification_cycle_id=payload.purification_cycle_id,
-        alert_type=payload.alert_type,
-        severity=payload.severity,
-        title=payload.title,
-        message=payload.message,
-        is_resolved=False,
-        created_at=now_utc(),
-    )
-
-    session.add(alert)
-    await session.commit()
-    await session.refresh(alert)
-    return alert
 
 
 async def list_alerts(
@@ -63,6 +42,7 @@ async def list_alerts(
     result = await session.execute(stmt)
 
     items: list[AlertOut] = []
+
     for alert, purifier_name in result.all():
         items.append(
             AlertOut(
@@ -86,22 +66,53 @@ async def list_alerts(
 async def resolve_alert(
     session: AsyncSession,
     alert_id: UUID,
-) -> Alert:
-    alert = await session.get(Alert, alert_id)
-    if not alert:
+    user_id: UUID,
+) -> AlertOut:
+    result = await session.execute(
+        select(Alert, WaterPurifier.name)
+        .join(WaterPurifier, Alert.water_purifier_id == WaterPurifier.id)
+        .where(Alert.id == alert_id)
+        .where(WaterPurifier.user_id == user_id)
+    )
+
+    row = result.one_or_none()
+
+    if row is None:
         raise ValueError("Alert not found")
 
-    alert.is_resolved = True
-    alert.resolved_at = now_utc()
+    alert, purifier_name = row
+
+    if not alert.is_resolved:
+        alert.is_resolved = True
+        alert.resolved_at = now_utc()
 
     await session.commit()
     await session.refresh(alert)
-    return alert
+
+    return AlertOut(
+        id=alert.id,
+        water_purifier_id=alert.water_purifier_id,
+        purifier_name=purifier_name,
+        purification_cycle_id=alert.purification_cycle_id,
+        alert_type=alert.alert_type,
+        severity=alert.severity,
+        title=alert.title,
+        message=alert.message,
+        is_resolved=alert.is_resolved,
+        created_at=alert.created_at,
+        resolved_at=alert.resolved_at,
+    )
 
 
-async def get_active_alert_count(session: AsyncSession) -> AlertActiveCountOut:
+async def get_active_alert_count(
+    session: AsyncSession,
+    user_id: UUID,
+) -> AlertActiveCountOut:
     count = await session.scalar(
-        select(func.count()).where(Alert.is_resolved.is_(False))
+        select(func.count(Alert.id))
+        .join(WaterPurifier, Alert.water_purifier_id == WaterPurifier.id)
+        .where(WaterPurifier.user_id == user_id)
+        .where(Alert.is_resolved.is_(False))
     )
 
     return AlertActiveCountOut(count=count or 0)
