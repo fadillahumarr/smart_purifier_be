@@ -16,10 +16,14 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # MQTT
-    MQTT_HOST: str = "localhost"
+    MQTT_HOST: str = "mqtt"
     MQTT_PORT: int = 1883
     MQTT_USERNAME: str | None = None
     MQTT_PASSWORD: str | None = None
+    
+    # MQTT PUBLIC
+    MQTT_PUBLIC_HOST: str = "localhost"
+    MQTT_PUBLIC_PORT: int = 1883
 
     # CORS
     CORS_ORIGINS: str | list[str] = []
@@ -50,7 +54,7 @@ class Settings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env.development",
         env_file_encoding="utf-8",
         extra="ignore",
     )
