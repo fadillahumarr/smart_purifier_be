@@ -24,6 +24,7 @@ from app.services.alert_engine import (
     create_cycle_failed_alert,
     create_high_turbidity_alert,
     create_water_not_clean_alert,
+    resolve_active_device_offline_alerts,
 )
 
 REALTIME_TTL_SECONDS = 300
@@ -98,6 +99,7 @@ async def handle_device_status(
     payload: MqttDeviceStatusPayload,
 ) -> DeviceStatusLog:
     purifier = await get_purifier_by_mac(session, payload.mac_address)
+
     if not purifier:
         raise ValueError("Purifier not found for this mac_address")
 
@@ -109,6 +111,19 @@ async def handle_device_status(
     )
 
     session.add(row)
+
+    status_value = (
+        payload.status.value
+        if hasattr(payload.status, "value")
+        else str(payload.status)
+    )
+
+    if status_value == "online":
+        await resolve_active_device_offline_alerts(
+            session=session,
+            water_purifier_id=purifier.id,
+        )
+
     await session.commit()
     await session.refresh(row)
 
