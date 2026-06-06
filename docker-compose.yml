@@ -1,0 +1,151 @@
+# BASE
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart_water_purifier_api
+    ports:
+      - "${API_PORT}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mqtt:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      DEBUG: ${DEBUG}
+    restart: unless-stopped
+
+  mqtt-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart_water_purifier_mqtt_worker
+    command: python scripts/run_mqtt_worker.py
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      DEBUG: ${DEBUG}
+    restart: unless-stopped
+
+  alert-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart_water_purifier_alert_worker
+    command: python scripts/run_alert_worker.py
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      DEBUG: ${DEBUG}
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: smart_water_purifier_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: smart_water_purifier_redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: smart_water_purifier_mqtt
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    container_name: smart_water_purifier_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: smart_water_purifier_grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
